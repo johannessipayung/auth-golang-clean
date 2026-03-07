@@ -83,15 +83,24 @@ pipeline {
             steps {
                 sh '''
                 docker rm -f chatbot-test || true
-                
-                # Map HOST_PORT (9090) ke CONTAINER_PORT (8080)
-                docker run -d -p $HOST_PORT:$CONTAINER_PORT --name chatbot-test $DOCKER_IMAGE
-                
+
+                # Jalankan dengan Environment Variables
+                # Jika DB ada di Local Mac, gunakan host.docker.internal
+                docker run -d -p 9090:8080 --name chatbot-test \
+                -e DB_HOST=host.docker.internal \
+                -e DB_PORT=5432 \
+                -e DB_USER=johannessipayung \
+                -e DB_PASSWORD=password123 \
+                -e DB_NAME=auth_golang_clean \
+                $DOCKER_IMAGE
+
                 sleep 10
                 
-                # Test ke port 9090
-                curl -f http://localhost:$HOST_PORT || (docker logs chatbot-test && exit 1)
-                
+                # Cek log jika gagal lagi
+                docker logs chatbot-test
+
+                curl -f http://localhost:9090 || exit 1
+
                 docker rm -f chatbot-test
                 '''
             }
