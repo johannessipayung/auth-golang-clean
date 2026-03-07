@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"auth-golang-clean/internal/delivery/http/handler"
+	"auth-golang-clean/internal/handler"
 	"auth-golang-clean/internal/usecase"
 	"bytes"
 	"encoding/json"
