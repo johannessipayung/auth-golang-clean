@@ -110,9 +110,14 @@ pipeline {
                 docker stop $APP_NAME || true
                 docker rm $APP_NAME || true
 
-                docker run -d \
-                -p $HOST_PORT:$CONTAINER_PORT \
+               docker run -d \
+                -p $PORT:8080 \
                 --name $APP_NAME \
+                -e DB_HOST=host.docker.internal \
+                -e DB_PORT=5432 \
+                -e DB_USER=johannessipayung \
+                -e DB_PASSWORD=password123 \
+                -e DB_NAME=auth_golang_clean \
                 $DOCKER_IMAGE
                 '''
             }
