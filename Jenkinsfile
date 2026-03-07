@@ -5,6 +5,8 @@ pipeline {
         APP_NAME = "chatbot-pendidikan-tinggi"
         DOCKER_IMAGE = "chatbot-pendidikan-tinggi:latest"
         PORT = "9090"
+        HOST_PORT = "9090"      // Port yang diakses dari luar (macOS)
+        CONTAINER_PORT = "8080" // Port yang ditulis di main.go
     }
 
     stages {
@@ -80,21 +82,17 @@ pipeline {
         stage('Run Container Test') {
             steps {
                 sh '''
-                # Hapus container lama jika ada
                 docker rm -f chatbot-test || true
-
-                # Jalankan container baru
-                docker run -d -p $PORT:8080 --name chatbot-test $DOCKER_IMAGE
-
-                # Tunggu container ready
+                
+                # Map HOST_PORT (9090) ke CONTAINER_PORT (8080)
+                docker run -d -p $HOST_PORT:$CONTAINER_PORT --name chatbot-test $DOCKER_IMAGE
+                
                 sleep 10
-
-                # Test endpoint
-                curl -f http://localhost:$PORT || exit 1
-
-                # Stop dan hapus container setelah test
-                docker stop chatbot-test
-                docker rm chatbot-test
+                
+                # Test ke port 9090
+                curl -f http://localhost:$HOST_PORT || (docker logs chatbot-test && exit 1)
+                
+                docker rm -f chatbot-test
                 '''
             }
         }
@@ -106,7 +104,7 @@ pipeline {
                 docker rm $APP_NAME || true
 
                 docker run -d \
-                -p $PORT:$PORT \
+                -p $HOST_PORT:$CONTAINER_PORT \
                 --name $APP_NAME \
                 $DOCKER_IMAGE
                 '''

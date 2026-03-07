@@ -34,7 +34,7 @@ func main() {
 
 	routes.SetupRoutes(r, authHandler)
 
-	if err := r.Run(":9090"); err != nil {
+	if err := r.Run(":8080"); err != nil {
 		log.Fatal(err)
 	}
 }
