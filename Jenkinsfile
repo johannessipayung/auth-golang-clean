@@ -80,12 +80,19 @@ pipeline {
         stage('Run Container Test') {
             steps {
                 sh '''
+                # Hapus container lama jika ada
+                docker rm -f chatbot-test || true
+
+                # Jalankan container baru
                 docker run -d -p $PORT:8080 --name chatbot-test $DOCKER_IMAGE
 
+                # Tunggu container ready
                 sleep 10
 
+                # Test endpoint
                 curl -f http://localhost:$PORT || exit 1
 
+                # Stop dan hapus container setelah test
                 docker stop chatbot-test
                 docker rm chatbot-test
                 '''
