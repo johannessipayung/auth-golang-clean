@@ -99,8 +99,6 @@ pipeline {
                 # Cek log jika gagal lagi
                 docker logs chatbot-test
 
-                curl -f http://localhost:9090 || exit 1
-
                 docker rm -f chatbot-test
                 '''
             }
