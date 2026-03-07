@@ -49,17 +49,13 @@ pipeline {
         stage('Run Unit Tests') {
             steps {
                 sh '''
-                go test ./... -v -coverprofile=coverage.out
-                go tool cover -func=coverage.out
+                go test ./... -v -coverprofile=coverage.out || exit 1
                 '''
             }
         }
-
         stage('Show Coverage') {
             steps {
-                sh '''
-                go tool cover -func=coverage.out
-                '''
+                sh 'go tool cover -func=coverage.out'
             }
         }
 
