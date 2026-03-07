@@ -22,7 +22,6 @@ func TestRegisterEndpoint(t *testing.T) {
 
 	// mock behaviour
 	mockRepo.On("Create", mock.Anything).Return(nil)
-	mockRepo.On("FindByEmail", "test@example.com").Return(nil, nil)
 
 	authUsecase := usecase.NewAuthUsecase(mockRepo)
 	authHandler := handler.NewAuthHandler(authUsecase)
