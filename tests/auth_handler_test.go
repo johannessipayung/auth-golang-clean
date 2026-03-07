@@ -1,14 +1,17 @@
 package tests
 
 import (
-	"auth-golang-clean/internal/handler"
+	"auth-golang-clean/internal/delivery/http/handler"
 	"auth-golang-clean/internal/usecase"
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestRegisterEndpoint(t *testing.T) {
@@ -17,24 +20,28 @@ func TestRegisterEndpoint(t *testing.T) {
 
 	mockRepo := new(MockUserRepository)
 
-	authUsecase := usecase.NewAuthUsecase(mockRepo)
+	// mock behaviour
+	mockRepo.On("Create", mock.Anything).Return(nil)
+	mockRepo.On("FindByEmail", "test@example.com").Return(nil, nil)
 
+	authUsecase := usecase.NewAuthUsecase(mockRepo)
 	authHandler := handler.NewAuthHandler(authUsecase)
 
 	router := gin.Default()
-
 	router.POST("/auth/register", authHandler.Register)
 
-	body := []byte(`{
-		"username":"test",
-		"email":"test@mail.com",
-		"password":"123456"
-	}`)
+	body := map[string]string{
+		"name":     "test",
+		"email":    "test@example.com",
+		"password": "password123",
+	}
+
+	jsonBody, _ := json.Marshal(body)
 
 	req, _ := http.NewRequest(
-		"POST",
+		http.MethodPost,
 		"/auth/register",
-		bytes.NewBuffer(body),
+		bytes.NewBuffer(jsonBody),
 	)
 
 	req.Header.Set("Content-Type", "application/json")
@@ -43,7 +50,7 @@ func TestRegisterEndpoint(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 got %d", w.Code)
-	}
+	assert.Equal(t, http.StatusCreated, w.Code)
+
+	mockRepo.AssertExpectations(t)
 }
