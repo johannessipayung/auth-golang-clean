@@ -1,0 +1,39 @@
+services:
+
+  postgres:
+    image: postgres:15
+    container_name: postgres-auth-golang
+    restart: always
+    environment:
+      POSTGRES_USER: johannessipayung
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: auth_golang_clean
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U johannessipayung -d auth_golang_clean"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: chatbot-pendidikan-tinggi
+    ports:
+      - "9090:9090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: johannessipayung
+      DB_PASSWORD: password123
+      DB_NAME: auth_golang_clean
+
+volumes:
+  postgres_data:
