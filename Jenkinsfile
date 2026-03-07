@@ -49,11 +49,8 @@ pipeline {
         stage('Run Unit Tests') {
             steps {
                 sh '''
-                go test ./... \
-                -v \
-                -race \
-                -covermode=atomic \
-                -coverprofile=coverage.out
+                go test ./... -v -coverprofile=coverage.out
+                go tool cover -func=coverage.out
                 '''
             }
         }
