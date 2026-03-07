@@ -80,7 +80,7 @@ pipeline {
         stage('Run Container Test') {
             steps {
                 sh '''
-                docker run -d -p $PORT:$PORT --name chatbot-test $DOCKER_IMAGE
+                docker run -d -p $PORT:8080 --name chatbot-test $DOCKER_IMAGE
 
                 sleep 10
 
