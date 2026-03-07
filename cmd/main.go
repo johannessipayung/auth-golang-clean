@@ -7,6 +7,7 @@ import (
 	"auth-golang-clean/internal/repository"
 	"auth-golang-clean/internal/usecase"
 	"auth-golang-clean/routes"
+	"log"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,8 +21,9 @@ func main() {
 		panic("failed to connect database: " + err.Error())
 	}
 
-	db.AutoMigrate(&entity.User{})
-
+	if err := db.AutoMigrate(&entity.User{}); err != nil {
+		log.Fatal(err)
+	}
 	userRepo := repository.NewUserRepository(db)
 
 	authUsecase := usecase.NewAuthUsecase(userRepo)
@@ -32,5 +34,7 @@ func main() {
 
 	routes.SetupRoutes(r, authHandler)
 
-	r.Run(":9090")
+	if err := r.Run(":9090"); err != nil {
+		log.Fatal(err)
+	}
 }

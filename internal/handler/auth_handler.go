@@ -17,7 +17,6 @@ func NewAuthHandler(uc usecase.AuthUsecase) *AuthHandler {
 }
 
 type AuthRequest struct {
-
 	Username string `json:"username"`
 
 	Email string `json:"email"`
@@ -29,8 +28,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	var req AuthRequest
 
-	c.ShouldBindJSON(&req)
-
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
 	err := h.authUsecase.Register(req.Username, req.Email, req.Password)
 
 	if err != nil {
@@ -47,8 +50,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	var req AuthRequest
 
-	c.ShouldBindJSON(&req)
-
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
 	token, refresh, err := h.authUsecase.Login(req.Email, req.Password)
 
 	if err != nil {
