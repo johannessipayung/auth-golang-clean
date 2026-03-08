@@ -1,0 +1,8 @@
+.git
+.gitignore
+node_modules
+bin
+coverage.out
+app
+*.log
+tests
