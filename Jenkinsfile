@@ -4,9 +4,17 @@ pipeline {
     environment {
         APP_NAME = "chatbot-pendidikan-tinggi"
         DOCKER_IMAGE = "chatbot-pendidikan-tinggi:latest"
-        PORT = "9090"
-        HOST_PORT = "9090"      // Port yang diakses dari luar (macOS)
-        CONTAINER_PORT = "8080" // Port yang ditulis di main.go
+        APP_PORT = "9090"
+        GO_BIN = "/usr/local/go/bin/go"
+        PATH = "/usr/local/go/bin:${env.PATH}"
+
+        // Database environment (VPS)
+        DB_HOST = "103.149.177.39"           // IP VPS
+        DB_USER = "johannessipayung"
+        DB_PASSWORD = "password123"
+        DB_NAME = "auth_golang_clean"
+        DB_PORT = "5432"
+        DB_SSLMODE = "disable"
     }
 
     stages {
@@ -20,9 +28,9 @@ pipeline {
         stage('Setup Go Modules') {
             steps {
                 sh '''
-                go version
-                go mod tidy
-                go mod download
+                ${GO_BIN} version
+                ${GO_BIN} mod tidy
+                ${GO_BIN} mod download
                 '''
             }
         }
@@ -36,104 +44,89 @@ pipeline {
             }
         }
 
-        stage('Run Linter') {
-            steps {
-                sh './bin/golangci-lint run ./...'
-            }
-        }
+        stage('Quality Checks') {
+            parallel {
+                stage('Lint') {
+                    steps {
+                        sh './bin/golangci-lint run ./...'
+                    }
+                }
 
-        stage('Go Vet') {
-            steps {
-                sh 'go vet ./...'
-            }
-        }
+                stage('Vet') {
+                    steps {
+                        sh '${GO_BIN} vet ./...'
+                    }
+                }
 
-        stage('Run Unit Tests') {
-            steps {
-                sh '''
-                go test ./tests -v -coverprofile=coverage.out
-                '''
-            }
-        }
-        stage('Show Coverage') {
-            steps {
-                sh '''
-                if [ -f coverage.out ]; then
-                    go tool cover -func=coverage.out
-                fi
-                '''
+                stage('Unit Tests') {
+                    steps {
+                        sh '${GO_BIN} test -v -coverprofile=coverage.out ./tests'
+                    }
+                }
             }
         }
 
         stage('Build Application') {
             steps {
-                sh '''
-                go build -o app ./cmd
-                '''
+                sh '${GO_BIN} build -o app ./cmd'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t chatbot-pendidikan-tinggi:latest -f docker/Dockerfile .'
+                sh 'docker build -t ${DOCKER_IMAGE} -f docker/Dockerfile .'
             }
         }
 
-        stage('Run Container Test') {
+        stage('Deploy to VPS') {
             steps {
-                sh '''
-                docker rm -f chatbot-test || true
+                sshagent(['vps-ssh']) {   // Credential SSH di Jenkins
+                    sh """
+                    ssh -o StrictHostKeyChecking=no root@${DB_HOST} '
+                        echo "Stopping old container if exists..."
+                        docker stop ${APP_NAME} || true
+                        docker rm ${APP_NAME} || true
 
-                # Jalankan dengan Environment Variables
-                # Jika DB ada di Local Mac, gunakan host.docker.internal
-                docker run -d -p 9090:8080 --name chatbot-test \
-                -e DB_HOST=host.docker.internal \
-                -e DB_PORT=5432 \
-                -e DB_USER=johannessipayung \
-                -e DB_PASSWORD=password123 \
-                -e DB_NAME=auth_golang_clean \
-                $DOCKER_IMAGE
-
-                sleep 10
-                
-                # Cek log jika gagal lagi
-                docker logs chatbot-test
-
-                docker rm -f chatbot-test
-                '''
+                        echo "Running new container..."
+                        docker run -d \
+                            --name ${APP_NAME} \
+                            -p ${APP_PORT}:8080 \
+                            --restart unless-stopped \
+                            -e DB_HOST=${DB_HOST} \
+                            -e DB_USER=${DB_USER} \
+                            -e DB_PASSWORD=${DB_PASSWORD} \
+                            -e DB_NAME=${DB_NAME} \
+                            -e DB_PORT=${DB_PORT} \
+                            -e DB_SSLMODE=${DB_SSLMODE} \
+                            ${DOCKER_IMAGE}
+                    '
+                    """
+                }
             }
         }
 
-        stage('Deploy Container') {
+        stage('Archive Coverage') {
             steps {
-                sh '''
-                docker stop $APP_NAME || true
-                docker rm $APP_NAME || true
+                archiveArtifacts artifacts: 'coverage.out', fingerprint: true
+            }
+        }
 
-               docker run -d \
-                -p $PORT:8080 \
-                --name $APP_NAME \
-                -e DB_HOST=host.docker.internal \
-                -e DB_PORT=5432 \
-                -e DB_USER=johannessipayung \
-                -e DB_PASSWORD=password123 \
-                -e DB_NAME=auth_golang_clean \
-                $DOCKER_IMAGE
-                '''
+        stage('Debug') {
+            steps {
+                sh 'docker --version'
+                sh 'which go'
+                sh 'docker ps -a'
             }
         }
     }
 
     post {
-
         always {
-            archiveArtifacts artifacts: 'coverage.out', fingerprint: true
+            echo 'Pipeline finished'
         }
-
         success {
             echo 'CI/CD Pipeline SUCCESS'
         }
-
         failure {
             echo 'CI/CD Pipeline FAILED'
         }
