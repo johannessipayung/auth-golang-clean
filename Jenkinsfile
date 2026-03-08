@@ -77,12 +77,6 @@ pipeline {
             }
         }
 
-        stage('Build Application') {
-            steps {
-                sh '${GO_BIN} build -o app ./cmd'
-            }
-        }
-
         stage('Build Docker Image') {
             steps {
                 sh '''

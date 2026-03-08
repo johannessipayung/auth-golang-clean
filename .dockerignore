@@ -1,8 +1,7 @@
 .git
 .gitignore
-node_modules
-bin
+tests
 coverage.out
 app
-*.log
-tests
+bin
+node_modules
