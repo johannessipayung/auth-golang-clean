@@ -1,16 +1,10 @@
-CREATE TABLE users (
-
-id SERIAL PRIMARY KEY,
-
-username VARCHAR(100) UNIQUE NOT NULL,
-
-email VARCHAR(100) UNIQUE NOT NULL,
-
-password TEXT NOT NULL,
-
-role VARCHAR(50) DEFAULT 'user',
-
-created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS users (
+    id bigserial primary key,
+    created_at timestamptz,
+    updated_at timestamptz,
+    deleted_at timestamptz,
+    username text unique,
+    email text unique,
+    password text,
+    role text
 );
