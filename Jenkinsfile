@@ -9,12 +9,16 @@ pipeline {
         PATH = "/usr/local/go/bin:${env.PATH}"
 
         // Database environment (VPS)
-        DB_HOST = "103.149.177.39"           // IP VPS
+        DB_HOST = "103.149.177.39"
         DB_USER = "johannessipayung"
         DB_PASSWORD = "password123"
         DB_NAME = "auth_golang_clean"
         DB_PORT = "5432"
         DB_SSLMODE = "disable"
+
+        VPS_USER = "root"
+        VPS_HOST = "103.149.177.39"
+        VPS_PATH = "/root"
     }
 
     stages {
@@ -78,11 +82,28 @@ pipeline {
             }
         }
 
-        stage('Deploy to VPS') {
+        stage('Save Docker Image') {
             steps {
-                sshagent(['vps-ssh']) {   // Credential SSH di Jenkins
+                sh 'docker save -o ${APP_NAME}.tar ${DOCKER_IMAGE}'
+            }
+        }
+
+        stage('Copy Image to VPS') {
+            steps {
+                sshagent(['vps-ssh']) {
+                    sh "scp ${APP_NAME}.tar ${VPS_USER}@${VPS_HOST}:${VPS_PATH}/"
+                }
+            }
+        }
+
+        stage('Deploy Container on VPS') {
+            steps {
+                sshagent(['vps-ssh']) {
                     sh """
-                    ssh -o StrictHostKeyChecking=no root@${DB_HOST} '
+                    ssh -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST} '
+                        echo "Loading Docker image..."
+                        docker load -i ${VPS_PATH}/${APP_NAME}.tar
+
                         echo "Stopping old container if exists..."
                         docker stop ${APP_NAME} || true
                         docker rm ${APP_NAME} || true
