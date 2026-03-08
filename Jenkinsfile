@@ -3,12 +3,17 @@ pipeline {
 
     environment {
         APP_NAME = "chatbot-pendidikan-tinggi"
-        DOCKER_IMAGE = "chatbot-pendidikan-tinggi:latest"
-        APP_PORT = "9090"
+        DOCKER_IMAGE = "peenesss/chatbot-pendidikan-tinggi"
+        DOCKER_TAG = "latest"
+        APP_PORT = "9091"
+
         GO_BIN = "/usr/local/go/bin/go"
         PATH = "/usr/local/go/bin:${env.PATH}"
 
-        // Database environment (VPS)
+        // DockerHub credential
+        DOCKER_CREDS = "dockerhub-creds"
+
+        // Database
         DB_HOST = "103.149.177.39"
         DB_USER = "johannessipayung"
         DB_PASSWORD = "password123"
@@ -16,9 +21,9 @@ pipeline {
         DB_PORT = "5432"
         DB_SSLMODE = "disable"
 
+        // VPS
         VPS_USER = "root"
         VPS_HOST = "103.149.177.39"
-        VPS_PATH = "/root"
     }
 
     stages {
@@ -50,6 +55,7 @@ pipeline {
 
         stage('Quality Checks') {
             parallel {
+
                 stage('Lint') {
                     steps {
                         sh './bin/golangci-lint run ./...'
@@ -67,6 +73,7 @@ pipeline {
                         sh '${GO_BIN} test -v -coverprofile=coverage.out ./tests'
                     }
                 }
+
             }
         }
 
@@ -78,48 +85,62 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t ${DOCKER_IMAGE} -f docker/Dockerfile .'
+                sh '''
+                docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} -f docker/Dockerfile .
+                '''
             }
         }
 
-        stage('Save Docker Image') {
+        stage('Login Docker Hub') {
             steps {
-                sh 'docker save -o ${APP_NAME}.tar ${DOCKER_IMAGE}'
-            }
-        }
+                withCredentials([usernamePassword(
+                    credentialsId: "${DOCKER_CREDS}",
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
 
-        stage('Copy Image to VPS') {
-            steps {
-                sshagent(['vps-ssh']) {
-                    sh "scp ${APP_NAME}.tar ${VPS_USER}@${VPS_HOST}:${VPS_PATH}/"
+                    sh '''
+                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                    '''
                 }
             }
         }
 
-        stage('Deploy Container on VPS') {
+        stage('Push Image to Docker Hub') {
+            steps {
+                sh '''
+                docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                '''
+            }
+        }
+
+        stage('Deploy to VPS') {
             steps {
                 sshagent(['vps-ssh']) {
+
                     sh """
                     ssh -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST} '
-                        echo "Loading Docker image..."
-                        docker load -i ${VPS_PATH}/${APP_NAME}.tar
 
-                        echo "Stopping old container if exists..."
+                        echo "Pull latest image from Docker Hub..."
+                        docker pull ${DOCKER_IMAGE}:${DOCKER_TAG}
+
+                        echo "Stop old container..."
                         docker stop ${APP_NAME} || true
                         docker rm ${APP_NAME} || true
 
-                        echo "Running new container..."
+                        echo "Run new container..."
                         docker run -d \
-                            --name ${APP_NAME} \
-                            -p ${APP_PORT}:8080 \
-                            --restart unless-stopped \
-                            -e DB_HOST=${DB_HOST} \
-                            -e DB_USER=${DB_USER} \
-                            -e DB_PASSWORD=${DB_PASSWORD} \
-                            -e DB_NAME=${DB_NAME} \
-                            -e DB_PORT=${DB_PORT} \
-                            -e DB_SSLMODE=${DB_SSLMODE} \
-                            ${DOCKER_IMAGE}
+                        --name ${APP_NAME} \
+                        -p ${APP_PORT}:8080 \
+                        --restart unless-stopped \
+                        -e DB_HOST=${DB_HOST} \
+                        -e DB_USER=${DB_USER} \
+                        -e DB_PASSWORD=${DB_PASSWORD} \
+                        -e DB_NAME=${DB_NAME} \
+                        -e DB_PORT=${DB_PORT} \
+                        -e DB_SSLMODE=${DB_SSLMODE} \
+                        ${DOCKER_IMAGE}:${DOCKER_TAG}
+
                     '
                     """
                 }
@@ -132,24 +153,21 @@ pipeline {
             }
         }
 
-        stage('Debug') {
-            steps {
-                sh 'docker --version'
-                sh 'which go'
-                sh 'docker ps -a'
-            }
-        }
     }
 
     post {
+
         always {
             echo 'Pipeline finished'
         }
+
         success {
             echo 'CI/CD Pipeline SUCCESS'
         }
+
         failure {
             echo 'CI/CD Pipeline FAILED'
         }
+
     }
 }
